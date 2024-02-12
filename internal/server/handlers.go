@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/GCrispino/rinha/internal/models"
+	"github.com/GCrispino/rinha-2024/internal/models"
 	"github.com/labstack/echo/v4"
 )
 

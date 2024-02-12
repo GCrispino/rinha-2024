@@ -1,4 +1,4 @@
-module github.com/GCrispino/rinha
+module github.com/GCrispino/rinha-2024
 
 go 1.19
 

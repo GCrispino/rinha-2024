@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	database "github.com/GCrispino/rinha/internal/database/connection"
-	"github.com/GCrispino/rinha/internal/database/repository"
-	"github.com/GCrispino/rinha/internal/server"
-	"github.com/GCrispino/rinha/internal/usecases/customers"
+	database "github.com/GCrispino/rinha-2024/internal/database/connection"
+	"github.com/GCrispino/rinha-2024/internal/database/repository"
+	"github.com/GCrispino/rinha-2024/internal/server"
+	"github.com/GCrispino/rinha-2024/internal/usecases/customers"
 )
 
 func main() {
@@ -34,8 +34,8 @@ func main() {
 		panic(err)
 	}
 
-    customersRepo := repository.NewCustomers(dbConn)
-    customersUsecase := customers.NewCustomerUsecase(customersRepo)
+	customersRepo := repository.NewCustomers(dbConn)
+	customersUsecase := customers.NewCustomerUsecase(customersRepo)
 
 	s := server.NewServer(customersUsecase)
 

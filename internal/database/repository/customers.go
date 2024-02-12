@@ -6,10 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	// "fmt"
-
-	"github.com/GCrispino/rinha/internal/database/connection"
-	"github.com/GCrispino/rinha/internal/models"
+	"github.com/GCrispino/rinha-2024/internal/database/connection"
+	"github.com/GCrispino/rinha-2024/internal/models"
 )
 
 type Customers struct {

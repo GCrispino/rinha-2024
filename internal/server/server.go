@@ -4,7 +4,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
-	"github.com/GCrispino/rinha/internal/usecases/customers"
+	"github.com/GCrispino/rinha-2024/internal/usecases/customers"
 )
 
 type Server struct {

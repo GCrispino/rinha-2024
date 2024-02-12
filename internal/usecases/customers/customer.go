@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GCrispino/rinha/internal/database/repository"
-	"github.com/GCrispino/rinha/internal/models"
+	"github.com/GCrispino/rinha-2024/internal/database/repository"
+	"github.com/GCrispino/rinha-2024/internal/models"
 )
 
 type CustomerUsecase struct {
