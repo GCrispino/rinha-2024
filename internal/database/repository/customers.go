@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/GCrispino/rinha-2024/internal/database/connection"
+	appErrors "github.com/GCrispino/rinha-2024/internal/errors"
 	"github.com/GCrispino/rinha-2024/internal/models"
 )
 
@@ -16,6 +17,22 @@ type Customers struct {
 
 func NewCustomers(conn *connection.DBConn) *Customers {
 	return &Customers{conn}
+}
+
+func getCustomer(ctx context.Context, tx *sql.Tx, id int) (customer *models.Customer, err error) {
+	query := `SELECT id, "limit", balance, created_at from customers WHERE id = $1`
+
+	row := tx.QueryRowContext(ctx, query, id)
+
+	customer = new(models.Customer)
+	if err = row.Scan(&customer.Id, &customer.Limit, &customer.Balance, &customer.CreatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = appErrors.ErrCustomerNotFound
+		}
+		return nil, err
+	}
+
+	return customer, nil
 }
 
 func (c *Customers) GetCustomerStatement(ctx context.Context, id int) (*models.Customer, []*models.Transaction, error) {
@@ -33,18 +50,15 @@ func (c *Customers) GetCustomerStatement(ctx context.Context, id int) (*models.C
 		}
 	}()
 
-	query := `SELECT id, "limit", balance, created_at from customers WHERE id = $1`
-
-	row := tx.QueryRowContext(ctx, query, id)
-
-	var customer models.Customer
-	if err := row.Scan(&customer.Id, &customer.Limit, &customer.Balance, &customer.CreatedAt); err != nil {
+	// TODO -> try removing this query
+	customer, err := getCustomer(ctx, tx, id)
+	if err != nil {
 		txErr = err
 		return nil, nil, txErr
 	}
 
 	// get customer transactions
-	query = `SELECT id, value, type, customer_id, created_at from transactions WHERE customer_id = $1 LIMIT 10`
+	query := `SELECT id, value, type, customer_id, created_at from transactions WHERE customer_id = $1 LIMIT 10`
 	rows, err := tx.QueryContext(ctx, query, id)
 	if err != nil {
 		txErr = fmt.Errorf("error getting customer transactions: %w", err)
@@ -72,7 +86,7 @@ func (c *Customers) GetCustomerStatement(ctx context.Context, id int) (*models.C
 		return nil, nil, txErr
 	}
 
-	return &customer, transactions, nil
+	return customer, transactions, nil
 }
 
 func (c *Customers) CreateCustomerTransaction(
@@ -110,29 +124,19 @@ func (c *Customers) CreateCustomerTransaction(
 		updateValue = -value
 	}
 
-	// res, err := tx.ExecContext(ctx, updateQuery, updateValue, customerId)
-	// if err != nil {
-	// 	txErr = fmt.Errorf("error running customer updating query: %w", err)
-	// 	return 0, 0, txErr
-	// }
-
-	// rowsAffected, err := res.RowsAffected()
-	// if err != nil {
-	// 	txErr = fmt.Errorf("error obtaining rows affected by customer updating query: %w", err)
-	// 	return 0, 0, txErr
-	// }
-
-	// if rowsAffected == 0 {
-	// 	txErr = fmt.Errorf("transaction results in negative balance")
-	// 	return 0, 0, txErr
-	// }
+	// TODO -> try removing this query
+	_, err = getCustomer(ctx, tx, customerId)
+	if err != nil {
+		txErr = err
+		return 0, 0, txErr
+	}
 
 	row := tx.QueryRowContext(ctx, updateQuery, updateValue, customerId)
 
 	var limit, total int
 	if err := row.Scan(&limit, &total); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			txErr = fmt.Errorf("transaction results in negative balance")
+			txErr = appErrors.ErrNegativeBalanceTxResult
 		} else {
 			txErr = fmt.Errorf("error scanning result of customer update query: %w", err)
 		}

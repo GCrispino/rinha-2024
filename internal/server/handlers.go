@@ -1,12 +1,15 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 
-	"github.com/GCrispino/rinha-2024/internal/models"
 	"github.com/labstack/echo/v4"
+
+	appErrors "github.com/GCrispino/rinha-2024/internal/errors"
+	"github.com/GCrispino/rinha-2024/internal/models"
 )
 
 func getCustomerIdFromRequest(c echo.Context) (int, error) {
@@ -38,7 +41,14 @@ func (s *Server) CreateTransactionHandler() echo.HandlerFunc {
 			req.Value, req.Type, req.Description,
 		)
 		if err != nil {
-			return err
+			switch {
+			case errors.Is(err, appErrors.ErrNegativeBalanceTxResult):
+				return echo.NewHTTPError(http.StatusUnprocessableEntity, err.Error())
+			case errors.Is(err, appErrors.ErrCustomerNotFound):
+				return echo.NewHTTPError(http.StatusNotFound, err.Error())
+			default:
+				return err
+			}
 		}
 
 		return c.JSON(http.StatusOK, res)
@@ -55,6 +65,9 @@ func (s *Server) GetStatementHandler() echo.HandlerFunc {
 		ctx := c.Request().Context()
 		resp, err := s.customers.GetCustomerStatement(ctx, id)
 		if err != nil {
+			if errors.Is(err, appErrors.ErrCustomerNotFound) {
+				return echo.NewHTTPError(http.StatusNotFound, err.Error())
+			}
 			return err
 		}
 
