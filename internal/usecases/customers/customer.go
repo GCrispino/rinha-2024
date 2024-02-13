@@ -7,6 +7,7 @@ import (
 
 	"github.com/GCrispino/rinha-2024/internal/database/repository"
 	"github.com/GCrispino/rinha-2024/internal/models"
+	"github.com/labstack/echo/v4"
 )
 
 type CustomerUsecase struct {
@@ -53,6 +54,17 @@ func (c *CustomerUsecase) CreateCustomerTransaction(ctx context.Context,
 	transactionType models.TransactionType,
 	description string,
 ) (*models.CreateCustomerTransactionResponse, error) {
+	switch transactionType {
+	case models.TransactionTypeCredit:
+	case models.TransactionTypeDebit:
+	default:
+		return nil, echo.ErrUnprocessableEntity
+	}
+
+	if description == "" || len(description) > 10 {
+		return nil, echo.ErrUnprocessableEntity
+	}
+
 	limit, total, err := c.repo.CreateCustomerTransaction(ctx, customer_id, value, transactionType, description)
 	if err != nil {
 		return nil, fmt.Errorf("error creating customer transaction: %w", err)

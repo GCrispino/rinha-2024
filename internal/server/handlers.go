@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -32,6 +33,10 @@ func (s *Server) CreateTransactionHandler() echo.HandlerFunc {
 		ctx := c.Request().Context()
 		req := new(models.CreateCustomerTransactionRequest)
 		if err := c.Bind(req); err != nil {
+			var unmarshalErr *json.UnmarshalTypeError
+			if errors.As(err, &unmarshalErr) {
+				return echo.ErrUnprocessableEntity
+			}
 			return fmt.Errorf("error binding CreateCustomerTransactionRequest request: %w", err)
 		}
 
@@ -51,6 +56,7 @@ func (s *Server) CreateTransactionHandler() echo.HandlerFunc {
 			}
 		}
 
+		s.Echo.Logger.Debug("response:", res)
 		return c.JSON(http.StatusOK, res)
 	}
 }
