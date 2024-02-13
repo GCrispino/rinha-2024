@@ -55,5 +55,5 @@ type CreateCustomerTransactionRequest struct {
 
 type CreateCustomerTransactionResponse struct {
 	Limit int `json:"limite"`
-	Total int `json:"total"`
+	Total int `json:"saldo"`
 }
