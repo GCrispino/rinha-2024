@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

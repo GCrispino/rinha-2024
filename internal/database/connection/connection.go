@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/GCrispino/rinha-2024/internal/utils"
+	"github.com/cenkalti/backoff/v4"
 	_ "github.com/lib/pq"
 )
 
@@ -17,7 +19,10 @@ func NewDBConn(driverName, connString string) (*DBConn, error) {
 		return nil, fmt.Errorf("Could not connect to db: %w", err)
 	}
 
-	if err := db.Ping(); err != nil {
+	err = backoff.Retry(func() error {
+		return db.Ping()
+	}, utils.DefaultBackoff())
+	if err != nil {
 		return nil, err
 	}
 
