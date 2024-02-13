@@ -59,7 +59,7 @@ func (c *Customers) GetCustomerStatement(ctx context.Context, id int) (*models.C
 
 	// get customer transactions
 	query := `
-		SELECT id, value, type, customer_id, created_at FROM transactions
+		SELECT id, value, type, description, customer_id, created_at FROM transactions
 		WHERE customer_id = $1
 		ORDER BY created_at DESC
 		LIMIT 10
@@ -78,6 +78,7 @@ func (c *Customers) GetCustomerStatement(ctx context.Context, id int) (*models.C
 			&transaction.Id,
 			&transaction.Value,
 			&transaction.Type,
+			&transaction.Description,
 			&transaction.CustomerId,
 			&transaction.CreatedAt,
 		); err != nil {
@@ -119,10 +120,11 @@ func (c *Customers) CreateCustomerTransaction(
 	updateQuery := `
       UPDATE customers SET balance = balance + $1
       WHERE id = $2 AND (balance + $1) >= -"limit"
+	  RETURNING "limit", balance
     `
 	insertQuery := `
-      INSERT INTO transactions (value, "type", customer_id)
-      VALUES ($1, $2, $3)
+      INSERT INTO transactions (value, "type", description, customer_id)
+      VALUES ($1, $2, $3, $4)
     `
 
 	updateValue := value
@@ -150,7 +152,7 @@ func (c *Customers) CreateCustomerTransaction(
 		return 0, 0, txErr
 	}
 
-	_, err = tx.ExecContext(ctx, insertQuery, value, transactionType, customerId)
+	_, err = tx.ExecContext(ctx, insertQuery, value, transactionType, description, customerId)
 	if err != nil {
 		txErr = fmt.Errorf("error running transaction insert query: %w", err)
 		return 0, 0, txErr
