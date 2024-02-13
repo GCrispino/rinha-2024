@@ -69,6 +69,7 @@ func (c *Customers) GetCustomerStatement(ctx context.Context, id int) (*models.C
 		txErr = fmt.Errorf("error getting customer transactions: %w", err)
 		return nil, nil, txErr
 	}
+	defer rows.Close()
 
 	transactions := make([]*models.Transaction, 0)
 	for rows.Next() {

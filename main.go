@@ -44,6 +44,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer dbConn.Conn.Close()
 
 	customersRepo := repository.NewCustomers(dbConn)
 	customersUsecase := customers.NewCustomerUsecase(customersRepo)
