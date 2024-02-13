@@ -11,6 +11,16 @@ import (
 	"github.com/GCrispino/rinha-2024/internal/usecases/customers"
 )
 
+type config struct {
+	dbConnStr string
+}
+
+func loadConfig() config {
+	return config{
+		dbConnStr: os.Getenv("DB_CONN_STR"),
+	}
+}
+
 func main() {
 	args := os.Args
 	lArgs := len(args)
@@ -27,9 +37,10 @@ func main() {
 		bindAddr = ":" + bindAddr
 	}
 
+	cfg := loadConfig()
+
 	driverName := "postgres"
-	dbConnStr := "postgres://user:password@localhost/rinha?sslmode=disable"
-	dbConn, err := database.NewDBConn(driverName, dbConnStr)
+	dbConn, err := database.NewDBConn(driverName, cfg.dbConnStr)
 	if err != nil {
 		panic(err)
 	}
