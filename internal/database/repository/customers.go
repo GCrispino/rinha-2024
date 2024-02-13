@@ -58,7 +58,12 @@ func (c *Customers) GetCustomerStatement(ctx context.Context, id int) (*models.C
 	}
 
 	// get customer transactions
-	query := `SELECT id, value, type, customer_id, created_at from transactions WHERE customer_id = $1 LIMIT 10`
+	query := `
+		SELECT id, value, type, customer_id, created_at FROM transactions
+		WHERE customer_id = $1
+		ORDER BY created_at DESC
+		LIMIT 10
+	`
 	rows, err := tx.QueryContext(ctx, query, id)
 	if err != nil {
 		txErr = fmt.Errorf("error getting customer transactions: %w", err)
