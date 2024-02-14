@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	database "github.com/GCrispino/rinha-2024/internal/database/connection"
@@ -12,12 +13,28 @@ import (
 )
 
 type config struct {
-	dbConnStr string
+	dbConnStr      string
+	dbMaxOpenConns int
 }
 
 func loadConfig() config {
+	dbConnStr := "postgres://user:password@localhost/rinha?sslmode=disable"
+	if c := os.Getenv("DB_CONN_STR"); c != "" {
+		dbConnStr = c
+	}
+
+	dbMaxOpenConns := 100
+	if maxOpenConns := os.Getenv("DB_MAX_OPEN_CONNS"); maxOpenConns != "" {
+		maxOpenConnsInt, err := strconv.Atoi(maxOpenConns)
+		// TODO -> log something if error is not nil
+		if err == nil {
+			dbMaxOpenConns = maxOpenConnsInt
+		}
+	}
+
 	return config{
-		dbConnStr: os.Getenv("DB_CONN_STR"),
+		dbConnStr:      dbConnStr,
+		dbMaxOpenConns: dbMaxOpenConns,
 	}
 }
 
@@ -40,7 +57,7 @@ func main() {
 	cfg := loadConfig()
 
 	driverName := "postgres"
-	dbConn, err := database.NewDBConn(driverName, cfg.dbConnStr)
+	dbConn, err := database.NewDBConn(driverName, cfg.dbConnStr, cfg.dbMaxOpenConns)
 	if err != nil {
 		panic(err)
 	}
