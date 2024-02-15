@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/GCrispino/rinha-2024/internal/database/connection"
 	appErrors "github.com/GCrispino/rinha-2024/internal/errors"
@@ -35,62 +36,93 @@ func getCustomer(ctx context.Context, tx *sql.Tx, id int) (customer *models.Cust
 	return customer, nil
 }
 
+type GetCustomerStatementResult struct {
+	// customer data
+	CustomerId        int
+	CustomerLimit     int
+	CustomerBalance   int
+	CustomerCreatedAt time.Time
+	// transaction data
+	TransactionId          *int
+	TransactionValue       *int
+	TransactionType        *models.TransactionType
+	TransactionDescription *string
+	TransactionCustomerId  *int
+	TransactionCreatedAt   *time.Time
+}
+
 func (c *Customers) GetCustomerStatement(ctx context.Context, id int) (*models.Customer, []*models.Transaction, error) {
-	tx, err := c.dbConn.Conn.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error beginning transaction: %w", err)
-	}
-
-	var txErr error
-	defer func() {
-		if txErr != nil {
-			if err := tx.Rollback(); err != nil {
-				// TODO -> log something
-			}
-		}
-	}()
-
-	// TODO -> try removing this query
-	customer, err := getCustomer(ctx, tx, id)
-	if err != nil {
-		txErr = err
-		return nil, nil, txErr
-	}
-
 	// get customer transactions
 	query := `
-		SELECT id, value, type, description, customer_id, created_at FROM transactions
-		WHERE customer_id = $1
-		ORDER BY created_at DESC
+		SELECT c.id, c.limit, c.balance, c.created_at, t.id, t.value, t.type, t.description, t.customer_id, t.created_at FROM customers c
+		LEFT JOIN transactions t ON c.id=t.customer_id 
+		WHERE c.id = $1
+		ORDER BY t.created_at DESC
 		LIMIT 10
 	`
-	rows, err := tx.QueryContext(ctx, query, id)
+
+	rows, err := c.dbConn.Conn.QueryContext(ctx, query, id)
 	if err != nil {
-		txErr = fmt.Errorf("error getting customer transactions: %w", err)
-		return nil, nil, txErr
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, appErrors.ErrCustomerNotFound
+		}
+		return nil, nil, fmt.Errorf("error getting customer transactions: %w", err)
 	}
 	defer rows.Close()
 
-	transactions := make([]*models.Transaction, 0)
+	results := make([]*GetCustomerStatementResult, 0)
+	hasRows := false
 	for rows.Next() {
-		transaction := new(models.Transaction)
+		hasRows = true
+		res := new(GetCustomerStatementResult)
 		if err := rows.Scan(
-			&transaction.Id,
-			&transaction.Value,
-			&transaction.Type,
-			&transaction.Description,
-			&transaction.CustomerId,
-			&transaction.CreatedAt,
+			&res.CustomerId,
+			&res.CustomerLimit,
+			&res.CustomerBalance,
+			&res.CustomerCreatedAt,
+			&res.TransactionId,
+			&res.TransactionValue,
+			&res.TransactionType,
+			&res.TransactionDescription,
+			&res.TransactionCustomerId,
+			&res.TransactionCreatedAt,
 		); err != nil {
 			return nil, nil, err
 		}
 
-		transactions = append(transactions, transaction)
+		results = append(results, res)
+	}
+	if !hasRows {
+		return nil, nil, appErrors.ErrCustomerNotFound
 	}
 
-	if err := tx.Commit(); err != nil {
-		txErr = fmt.Errorf("error commiting transaction: %w", err)
-		return nil, nil, txErr
+	firstRes := results[0]
+	customer := &models.Customer{
+		Id:        firstRes.CustomerId,
+		Limit:     firstRes.CustomerLimit,
+		Balance:   firstRes.CustomerBalance,
+		CreatedAt: firstRes.CustomerCreatedAt,
+	}
+
+	var transactions []*models.Transaction
+	if len(results) == 1 && results[0].TransactionId == nil {
+		return customer, transactions, nil
+	}
+
+	if firstRes.TransactionId == nil {
+		return customer, transactions, nil
+	}
+
+	transactions = make([]*models.Transaction, len(results))
+	for i, tx := range results {
+		transactions[i] = &models.Transaction{
+			Id:          *tx.TransactionId,
+			Value:       *tx.TransactionValue,
+			Type:        *tx.TransactionType,
+			Description: *tx.TransactionDescription,
+			CustomerId:  *tx.TransactionCustomerId,
+			CreatedAt:   *tx.TransactionCreatedAt,
+		}
 	}
 
 	return customer, transactions, nil
@@ -118,9 +150,15 @@ func (c *Customers) CreateCustomerTransaction(
 	}()
 
 	updateQuery := `
-      UPDATE customers SET balance = balance + $1
-      WHERE id = $2 AND (balance + $1) >= -"limit"
-	  RETURNING "limit", balance
+		with
+			c AS (SELECT * FROM customers c WHERE id = $2),
+			u AS (
+				UPDATE customers c2 SET balance = balance + $1
+				WHERE id = $2 AND (balance + $1) >= -"limit"
+				RETURNING id, "limit", balance
+			),
+			cu AS (SELECT COUNT(*) FROM u)
+		SELECT c.limit, c.balance, cu.count as count_update FROM c, cu
     `
 	insertQuery := `
       INSERT INTO transactions (value, "type", description, customer_id)
@@ -132,23 +170,21 @@ func (c *Customers) CreateCustomerTransaction(
 		updateValue = -value
 	}
 
-	// TODO -> try removing this query
-	_, err = getCustomer(ctx, tx, customerId)
-	if err != nil {
-		txErr = err
-		return 0, 0, txErr
-	}
-
 	row := tx.QueryRowContext(ctx, updateQuery, updateValue, customerId)
 
-	var limit, total int
-	if err := row.Scan(&limit, &total); err != nil {
+	var limit, total, updateCount int
+	if err := row.Scan(&limit, &total, &updateCount); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			txErr = appErrors.ErrNegativeBalanceTxResult
+			txErr = appErrors.ErrCustomerNotFound
 		} else {
 			txErr = fmt.Errorf("error scanning result of customer update query: %w", err)
 		}
 
+		return 0, 0, txErr
+	}
+
+	if updateCount == 0 {
+		txErr = appErrors.ErrNegativeBalanceTxResult
 		return 0, 0, txErr
 	}
 
@@ -163,5 +199,5 @@ func (c *Customers) CreateCustomerTransaction(
 		return 0, 0, txErr
 	}
 
-	return limit, total, nil
+	return limit, total + updateValue, nil
 }
