@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	_ "go.uber.org/automaxprocs"
+
 	database "github.com/GCrispino/rinha-2024/internal/database/connection"
 	"github.com/GCrispino/rinha-2024/internal/database/repository"
 	"github.com/GCrispino/rinha-2024/internal/server"
