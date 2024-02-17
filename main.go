@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strconv"
 	"strings"
@@ -15,6 +18,7 @@ import (
 )
 
 type config struct {
+	debugPprof     bool
 	dbConnStr      string
 	dbMaxOpenConns int
 }
@@ -23,6 +27,12 @@ func loadConfig() config {
 	dbConnStr := "postgres://user:password@localhost/rinha?sslmode=disable"
 	if c := os.Getenv("DB_CONN_STR"); c != "" {
 		dbConnStr = c
+	}
+	fmt.Println("dbConnStr", dbConnStr)
+
+	debugPprof := false
+	if d := os.Getenv("DEBUG_PPROF"); d != "" {
+		debugPprof, _ = strconv.ParseBool(d)
 	}
 
 	dbMaxOpenConns := 100
@@ -35,6 +45,7 @@ func loadConfig() config {
 	}
 
 	return config{
+		debugPprof:     debugPprof,
 		dbConnStr:      dbConnStr,
 		dbMaxOpenConns: dbMaxOpenConns,
 	}
@@ -68,6 +79,14 @@ func main() {
 	customersRepo := repository.NewCustomers(dbConn)
 	customersUsecase := customers.NewCustomerUsecase(customersRepo)
 
+	// if configured, run debug server
+	if cfg.debugPprof {
+		go func() {
+			log.Println(http.ListenAndServe("localhost:6060", nil))
+		}()
+	}
+
+	// run actual server
 	s := server.NewServer(customersUsecase)
 
 	s.Logger.Fatal(s.Start(bindAddr))
