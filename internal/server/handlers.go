@@ -37,7 +37,12 @@ func (s *Server) CreateTransactionHandler() echo.HandlerFunc {
 			if errors.As(err, &unmarshalErr) {
 				return echo.ErrUnprocessableEntity
 			}
-			return fmt.Errorf("error binding CreateCustomerTransactionRequest request: %w", err)
+
+			var httpError *echo.HTTPError
+			if errors.As(err, &httpError) && httpError.Code > 399 {
+				return echo.ErrUnprocessableEntity
+			}
+			return fmt.Errorf("error binding CreateCustomerTransactionRequest request : %w", err)
 		}
 
 		res, err := s.customers.CreateCustomerTransaction(
