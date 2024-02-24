@@ -1,28 +1,33 @@
 package connection
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 
 	"github.com/GCrispino/rinha-2024/internal/utils"
 	"github.com/cenkalti/backoff/v4"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DBConn struct {
-	Conn *sql.DB
+	Conn *pgxpool.Pool
 }
 
-func NewDBConn(driverName, connString string, maxOpenConns int) (*DBConn, error) {
-	db, err := sql.Open(driverName, connString)
+func NewDBConn(ctx context.Context, driverName, connString string, maxOpenConns int) (*DBConn, error) {
+	cfg, err := pgxpool.ParseConfig(connString)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse config from conn string: %w", err)
+	}
+
+	cfg.MaxConns = int32(maxOpenConns)
+
+	db, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("Could not connect to db: %w", err)
 	}
 
-	db.SetMaxOpenConns(maxOpenConns)
-
 	err = backoff.Retry(func() error {
-		return db.Ping()
+		return db.Ping(ctx)
 	}, utils.DefaultBackoff())
 	if err != nil {
 		return nil, err

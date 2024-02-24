@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -69,8 +70,9 @@ func main() {
 
 	cfg := loadConfig()
 
+	ctx := context.Background()
 	driverName := "postgres"
-	dbConn, err := database.NewDBConn(driverName, cfg.dbConnStr, cfg.dbMaxOpenConns)
+	dbConn, err := database.NewDBConn(ctx, driverName, cfg.dbConnStr, cfg.dbMaxOpenConns)
 	if err != nil {
 		panic(err)
 	}

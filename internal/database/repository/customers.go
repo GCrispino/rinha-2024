@@ -10,6 +10,7 @@ import (
 	"github.com/GCrispino/rinha-2024/internal/database/connection"
 	appErrors "github.com/GCrispino/rinha-2024/internal/errors"
 	"github.com/GCrispino/rinha-2024/internal/models"
+	"github.com/jackc/pgx/v5"
 )
 
 type Customers struct {
@@ -61,7 +62,7 @@ func (c *Customers) GetCustomerStatement(ctx context.Context, id int) (*models.C
 		LIMIT 10
 	`
 
-	rows, err := c.dbConn.Conn.QueryContext(ctx, query, id)
+	rows, err := c.dbConn.Conn.Query(ctx, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, appErrors.ErrCustomerNotFound
@@ -116,12 +117,15 @@ func (c *Customers) GetCustomerStatement(ctx context.Context, id int) (*models.C
 	transactions = make([]*models.Transaction, len(results))
 	for i, tx := range results {
 		transactions[i] = &models.Transaction{
-			Id:          *tx.TransactionId,
-			Value:       *tx.TransactionValue,
-			Type:        *tx.TransactionType,
-			Description: *tx.TransactionDescription,
-			CustomerId:  *tx.TransactionCustomerId,
-			CreatedAt:   *tx.TransactionCreatedAt,
+			Id:    *tx.TransactionId,
+			Value: *tx.TransactionValue,
+			Type:  *tx.TransactionType,
+			//Description: *tx.TransactionDescription,
+			CustomerId: *tx.TransactionCustomerId,
+			CreatedAt:  *tx.TransactionCreatedAt,
+		}
+		if desc := tx.TransactionDescription; desc != nil {
+			transactions[i].Description = *desc
 		}
 	}
 
@@ -135,7 +139,7 @@ func (c *Customers) CreateCustomerTransaction(
 	transactionType models.TransactionType,
 	description string,
 ) (int, int, error) {
-	tx, err := c.dbConn.Conn.BeginTx(ctx, nil)
+	tx, err := c.dbConn.Conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return 0, 0, fmt.Errorf("error beginning transaction: %w", err)
 	}
@@ -143,7 +147,7 @@ func (c *Customers) CreateCustomerTransaction(
 	var txErr error
 	defer func() {
 		if txErr != nil {
-			if err := tx.Rollback(); err != nil {
+			if err := tx.Rollback(ctx); err != nil {
 				// TODO -> log something
 			}
 		}
@@ -170,7 +174,7 @@ func (c *Customers) CreateCustomerTransaction(
 		updateValue = -value
 	}
 
-	row := tx.QueryRowContext(ctx, updateQuery, updateValue, customerId)
+	row := tx.QueryRow(ctx, updateQuery, updateValue, customerId)
 
 	var limit, total, updateCount int
 	if err := row.Scan(&limit, &total, &updateCount); err != nil {
@@ -188,13 +192,13 @@ func (c *Customers) CreateCustomerTransaction(
 		return 0, 0, txErr
 	}
 
-	_, err = tx.ExecContext(ctx, insertQuery, value, transactionType, description, customerId)
+	_, err = tx.Exec(ctx, insertQuery, value, transactionType, description, customerId)
 	if err != nil {
 		txErr = fmt.Errorf("error running transaction insert query: %w", err)
 		return 0, 0, txErr
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		txErr = fmt.Errorf("error commiting transaction: %w", err)
 		return 0, 0, txErr
 	}
