@@ -9,4 +9,3 @@ Participação na Rinha de Backend 2024
     -  [`go-json`](https://github.com/goccy/go-json/) para serialização de JSON no servidor;
     - [`pq`](https://github.com/lib/pq) como driver de Postgres;
     - [`automaxprocs`](https://github.com/uber-go/automaxprocs) para configurar automaticamente a variável de ambiente [`GOMAXPROCS`](https://dave.cheney.net/tag/gomaxprocs).
-- [Repositório da api](https://github.com/GCrispino/rinha-2024).
